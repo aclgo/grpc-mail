@@ -3,23 +3,27 @@ package usecase
 import (
 	"github.com/aclgo/grpc-mail/internal/mail"
 	"github.com/aclgo/grpc-mail/internal/models"
+	"github.com/aclgo/grpc-mail/pkg/logger"
 	"github.com/pkg/errors"
 )
 
 type mailUseCase struct {
 	mailUC mail.MailUseCase
+	logger logger.Logger
 }
 
-func NewmailUseCase(mailUC mail.MailUseCase) *mailUseCase {
+func NewmailUseCase(mailUC mail.MailUseCase, logger logger.Logger) *mailUseCase {
 	return &mailUseCase{
 		mailUC: mailUC,
+		logger: logger,
 	}
 }
 
-func (u *mailUseCase) Send(data *models.MailBody) (string, error) {
+func (u *mailUseCase) Send(data *models.MailBody) error {
 	if err := u.mailUC.Send(data); err != nil {
-		return "", errors.Wrap(err, "Send.mailUC.Send")
+		u.logger.Errorf("Send.mailUC.Send:%v", err)
+		return errors.Wrap(err, "Send.mailUC.Send")
 	}
 
-	return mail.EmailSentSuccess, nil
+	return nil
 }
