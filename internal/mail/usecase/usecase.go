@@ -25,5 +25,7 @@ func (u *mailUseCase) Send(data *models.MailBody) error {
 		return errors.Wrap(err, "Send.mailUC.Send")
 	}
 
+	u.logger.Infof("%s to %s", mail.EmailSentSuccess, data.To)
+
 	return nil
 }
