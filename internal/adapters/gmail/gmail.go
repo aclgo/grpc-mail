@@ -36,7 +36,15 @@ func NewGmail(config *config.Config) *Gmail {
 
 func (g *Gmail) Send(data *models.MailBody) error {
 
-	bodyMessage := fmt.Sprintf(MessageFormat, data.Subject, data.Body)
+	bodyMessage := func() string {
+		if data.Template != "" {
+			body := fmt.Sprintf(data.Template, data.Body)
+
+			return fmt.Sprintf(MessageFormat, data.Subject, body)
+		}
+
+		return fmt.Sprintf(MessageFormat, data.Subject, data.Body)
+	}()
 
 	if err := smtp.SendMail(
 		g.Addr,
