@@ -11,6 +11,8 @@ import (
 	grpcService "github.com/aclgo/grpc-mail/internal/mail/delivery/grpc/service"
 	httpService "github.com/aclgo/grpc-mail/internal/mail/delivery/http/service"
 	"github.com/aclgo/grpc-mail/pkg/logger"
+	"github.com/aclgo/grpc-mail/proto"
+
 	"google.golang.org/grpc"
 )
 
@@ -18,7 +20,7 @@ type Server struct {
 	config       *config.Config
 	logger       logger.Logger
 	servicesHTTP []*HttpHandlerService
-	serviceGRPC  []*grpcService.MailService
+	servicesGRPC *grpcService.MailService
 	stopFn       sync.Once
 }
 
@@ -37,12 +39,12 @@ func NewHttpHandlerService(pattern string, service *httpService.MailService) *Ht
 func NewServer(cfg *config.Config,
 	logger logger.Logger,
 	svcsHTTP []*HttpHandlerService,
-	svcGRPC []*grpcService.MailService) *Server {
+	svcsGRPC *grpcService.MailService) *Server {
 	return &Server{
 		config:       cfg,
 		logger:       logger,
 		servicesHTTP: svcsHTTP,
-		serviceGRPC:  svcGRPC,
+		servicesGRPC: svcsGRPC,
 	}
 }
 
@@ -54,6 +56,9 @@ func (s *Server) Run(ctxSignal context.Context) error {
 		errHTTP = make(chan error)
 		errGRPC = make(chan error)
 	)
+
+	// interceptorHTTP := interceptors.NewinterceptorHTTP(s.logger)
+	// interceptorGRPC := interceptors.NewinterceptorGRPC(s.logger)
 
 	go func() {
 		err := s.httpRun(ctxHttp)
@@ -82,9 +87,11 @@ func (s *Server) Run(ctxSignal context.Context) error {
 	}
 }
 
-func (s *Server) Stop() error {
-	return nil
-}
+// type httpServer struct{}
+
+// func (s *httpServer) Shutdown(ctx context.Context) error {
+// 	return nil
+// }
 
 func (s *Server) httpRun(ctx context.Context) error {
 	mux := http.NewServeMux()
@@ -102,6 +109,13 @@ func (s *Server) httpRun(ctx context.Context) error {
 	return nil
 }
 
+// type grpcServer struct {
+// }
+
+// func (s *grpcServer) Shutdown(ctx context.Context) error {
+// 	return nil
+// }
+
 func (s *Server) grpcRun() error {
 
 	l, err := net.Listen("tcp", fmt.Sprintf(":%d", s.config.ServiceGRPCPort))
@@ -113,6 +127,8 @@ func (s *Server) grpcRun() error {
 	opts := []grpc.ServerOption{}
 
 	srv := grpc.NewServer(opts...)
+
+	proto.RegisterMailServiceServer(srv, s.servicesGRPC)
 
 	s.logger.Infof("server GRPC run on port %d", s.config.ServiceGRPCPort)
 	err = srv.Serve(l)
