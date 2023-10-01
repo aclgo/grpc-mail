@@ -12,9 +12,9 @@ type MailService struct {
 	proto.UnimplementedMailServiceServer
 }
 
-func NewMailService(mailUC mail.MailUseCase, logger logger.Logger) *MailService {
+func NewMailService(logger logger.Logger, mailUC mail.MailUseCase) *MailService {
 	return &MailService{
-		mailUC: mailUC,
 		logger: logger,
+		mailUC: mailUC,
 	}
 }
