@@ -7,6 +7,7 @@ message MailRequest {
     string to = 2;
     string subject = 3;
     string body = 4;
+    string template = 5;
 }
 
 message MailResponse {
