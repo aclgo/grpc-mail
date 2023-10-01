@@ -10,6 +10,7 @@ import (
 	"github.com/aclgo/grpc-mail/config"
 	grpcService "github.com/aclgo/grpc-mail/internal/mail/delivery/grpc/service"
 	httpService "github.com/aclgo/grpc-mail/internal/mail/delivery/http/service"
+	"github.com/aclgo/grpc-mail/internal/telemetry"
 	"github.com/aclgo/grpc-mail/pkg/logger"
 	"github.com/aclgo/grpc-mail/proto"
 
@@ -21,6 +22,7 @@ type Server struct {
 	logger       logger.Logger
 	servicesHTTP []*HttpHandlerService
 	servicesGRPC *grpcService.MailService
+	provider     *telemetry.Provider
 	stopFn       sync.Once
 }
 
@@ -39,12 +41,13 @@ func NewHttpHandlerService(pattern string, service *httpService.MailService) *Ht
 func NewServer(cfg *config.Config,
 	logger logger.Logger,
 	svcsHTTP []*HttpHandlerService,
-	svcsGRPC *grpcService.MailService) *Server {
+	svcsGRPC *grpcService.MailService, provider *telemetry.Provider) *Server {
 	return &Server{
 		config:       cfg,
 		logger:       logger,
 		servicesHTTP: svcsHTTP,
 		servicesGRPC: svcsGRPC,
+		provider:     provider,
 	}
 }
 
