@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"log"
 	"os"
 
 	"github.com/aclgo/grpc-mail/config"
@@ -28,34 +29,39 @@ type apiLogger struct {
 }
 
 func NewapiLogger(config *config.Config) *apiLogger {
-	return &apiLogger{
+	apiLogger := &apiLogger{
 		config: config,
 	}
+
+	if err := apiLogger.StartLogger(); err != nil {
+		log.Printf("NewapiLogger.StartLogger: %v", err)
+	}
+
+	return apiLogger
 }
 
-var (
-	mapLogLevel = map[string]zapcore.Level{
-		"debug":  zapcore.DebugLevel,
-		"info":   zapcore.InfoLevel,
-		"warn":   zapcore.WarnLevel,
-		"error":  zapcore.ErrorLevel,
-		"dpanic": zapcore.DPanicLevel,
-		"panic":  zapcore.PanicLevel,
-		"fatal":  zapcore.FatalLevel,
-	}
-)
+var mapLogLevel = map[string]zapcore.Level{
+	"debug":  zapcore.DebugLevel,
+	"info":   zapcore.InfoLevel,
+	"warn":   zapcore.WarnLevel,
+	"error":  zapcore.ErrorLevel,
+	"dpanic": zapcore.DPanicLevel,
+	"panic":  zapcore.PanicLevel,
+	"fatal":  zapcore.FatalLevel,
+}
 
 func getLoggerLevel(cfg *config.Config) zapcore.Level {
 	level, ok := mapLogLevel[cfg.Logger.Level]
-	if ok {
-		return level
+	if !ok && cfg.Logger.Level == "" {
+		return zapcore.DebugLevel
 	}
 
-	return zapcore.DebugLevel
+	return level
 }
 
 func (l *apiLogger) StartLogger() error {
 	loggerLevel := getLoggerLevel(l.config)
+
 	loggerWriter := zapcore.AddSync(os.Stderr)
 
 	encoderConfig := zapcore.EncoderConfig{}
@@ -86,7 +92,7 @@ func (l *apiLogger) StartLogger() error {
 
 	l.sugaredLogger = logger.Sugar()
 	if err := l.sugaredLogger.Sync(); err != nil {
-		l.sugaredLogger.Error(err)
+		log.Printf("StartLogger.Sync: %v", err)
 	}
 
 	return nil
