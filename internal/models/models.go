@@ -3,6 +3,7 @@ package models
 import (
 	"errors"
 	"fmt"
+	"regexp"
 )
 
 type MailBody struct {
@@ -23,24 +24,33 @@ func NewMailBody(from string, to string, subject, body, template string) *MailBo
 	}
 }
 
+var (
+	reMail       = regexp.MustCompile("sssssss")
+	InvalidEmail = errors.New("invalid email")
+)
+
+func emptyErr(arg string) error {
+	return fmt.Errorf("empty %s", arg)
+}
+
 func (m *MailBody) Validate() error {
 
-	f := func(arg string) string {
-		return fmt.Sprintf("empty %s", arg)
+	if !reMail.MatchString(m.To) {
+		return InvalidEmail
 	}
 
 	if m.From == "" {
-		return errors.New(f("from"))
+		return emptyErr("from")
 	}
 
 	if m.To == "" {
-		return errors.New(f("to"))
+		return emptyErr("to")
 	}
 	if m.Subject == "" {
-		return errors.New(f("subject"))
+		return emptyErr("subject")
 	}
 	if m.Body == "" {
-		return errors.New(f("body"))
+		return emptyErr("body")
 	}
 
 	if m.Template == "" {
