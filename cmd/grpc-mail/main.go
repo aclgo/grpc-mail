@@ -14,15 +14,17 @@ import (
 	httpService "github.com/aclgo/grpc-mail/internal/mail/delivery/http/service"
 	"github.com/aclgo/grpc-mail/internal/mail/usecase"
 	"github.com/aclgo/grpc-mail/internal/server"
+	"github.com/aclgo/grpc-mail/internal/telemetry"
 	"github.com/aclgo/grpc-mail/pkg/logger"
 )
 
 func main() {
 
 	cfg := config.Load(".")
-	cfg.ServiceHTTPPort = 3000
 
 	logger := logger.NewapiLogger(cfg)
+
+	logger.Info("logger init")
 
 	ses := ses.NewSes(cfg)
 	gmail := gmail.NewGmail(cfg)
@@ -30,14 +32,32 @@ func main() {
 	sesUC := usecase.NewmailUseCase(ses, logger)
 	gmailUC := usecase.NewmailUseCase(gmail, logger)
 
+	// HTTP services
 	serviceSesHTTP := httpService.NewMailService(sesUC, logger)
-	serviceSesGRPC := grpcService.NewMailService(sesUC, logger)
-
 	serviceGmailHTTP := httpService.NewMailService(gmailUC, logger)
-	serviceGmailGRPC := grpcService.NewMailService(gmailUC, logger)
 
+	// handlers http
 	handlerSvcSes := server.NewHttpHandlerService("/ses", serviceSesHTTP)
 	handlerSvcGmail := server.NewHttpHandlerService("/gmail", serviceGmailHTTP)
+
+	// GRPC services
+	servicesGRPC := grpcService.NewMailService(logger, sesUC)
+
+	// providerConfig := telemetry.ProviderConfig{
+	// 	Logger: logger,
+	// }
+
+	// providerConfig.Start()
+
+	provider, err := telemetry.NewProvider(cfg, logger)
+	defer func() {
+		if err != nil {
+			logger.Errorf("cannot initialize telemetry: %v", err)
+			os.Exit(1)
+		}
+	}()
+
+	defer provider.Shutdown()
 
 	server := server.NewServer(cfg,
 		logger,
@@ -45,14 +65,14 @@ func main() {
 			handlerSvcSes,
 			handlerSvcGmail,
 		},
-		[]*grpcService.MailService{
-			serviceSesGRPC,
-			serviceGmailGRPC,
-		},
+		servicesGRPC,
+		provider,
 	)
 
-	signal, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
+	signal, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	log.Fatal(server.Run(signal))
+	if err := server.Run(signal); err != nil {
+		log.Fatal(err)
+	}
 }
