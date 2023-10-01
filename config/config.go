@@ -13,6 +13,9 @@ type Config struct {
 	ServiceGRPCPort int           `mapstructure:"API_GRPC_PORT"`
 	IntervalSend    time.Duration `mapstructure:"INTERVAL_SEND"`
 	Logger
+	Tracer
+	Meter
+	OtelExporter string
 	Gmail
 	Ses
 }
@@ -23,10 +26,12 @@ type Logger struct {
 	Level      string `mapstructure:"LOG_LEVEL"`
 }
 
-type Redis struct {
-	Addr     string `mapstructure:"REDIS_ADDR"`
-	Password string `mapstructure:"REDIS_PASSWORD"`
-	DB       int    `mapstructure:"DB"`
+type Tracer struct {
+	Name string `mapstructure:"TRACE_NAME"`
+}
+
+type Meter struct {
+	Name string `mapstructure:"METER_NAME"`
 }
 
 type Ses struct {
@@ -46,6 +51,7 @@ func Load(path string) *Config {
 		return loadFromFile(path)
 	}
 
+	log.Println("env variable DEV=false reading from system")
 	return loadFromEnv()
 }
 
@@ -56,7 +62,7 @@ func loadFromFile(path string) *Config {
 	viper.SetConfigName("app")
 	viper.AddConfigPath(path)
 	viper.SetConfigFile(".env")
-	viper.SetConfigType(".env")
+	viper.SetConfigType("env")
 
 	viper.AutomaticEnv()
 
@@ -68,9 +74,10 @@ func loadFromFile(path string) *Config {
 		log.Fatalf("LoadFile.Unmarshal: %v", err)
 	}
 
-	return nil
+	return &config
 }
 
 func loadFromEnv() *Config {
+
 	return &Config{}
 }
