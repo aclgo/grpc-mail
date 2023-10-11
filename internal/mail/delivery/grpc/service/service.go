@@ -6,15 +6,27 @@ import (
 	"github.com/aclgo/grpc-mail/proto"
 )
 
+type MailServiceLoad struct {
+	NameService string
+	Service     mail.MailUseCase
+}
+
+func NewMailServiceLoad(name string, service mail.MailUseCase) *MailServiceLoad {
+	return &MailServiceLoad{
+		NameService: name,
+		Service:     service,
+	}
+}
+
 type MailService struct {
-	mailUC mail.MailUseCase
-	logger logger.Logger
+	mailUCS []*MailServiceLoad
+	logger  logger.Logger
 	proto.UnimplementedMailServiceServer
 }
 
-func NewMailService(logger logger.Logger, mailUC mail.MailUseCase) *MailService {
+func NewMailService(logger logger.Logger, mailsl ...*MailServiceLoad) *MailService {
 	return &MailService{
-		logger: logger,
-		mailUC: mailUC,
+		logger:  logger,
+		mailUCS: mailsl,
 	}
 }

@@ -1,6 +1,6 @@
 syntax =  "proto3";
 
-option go_package = "github.com/aclgo/grpc-mail/proto";
+option go_package = "github.com/aclgo/grpc-jwt/proto";  
 
 message MailRequest {
     string from = 1;
@@ -8,6 +8,7 @@ message MailRequest {
     string subject = 3;
     string body = 4;
     string template = 5;
+    string servicename = 6;
 }
 
 message MailResponse {

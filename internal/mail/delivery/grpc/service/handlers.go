@@ -19,11 +19,20 @@ func (s *MailService) SendService(ctx context.Context, req *proto.MailRequest) (
 		return nil, status.Errorf(codes.InvalidArgument, "ssss: %v", err)
 	}
 
-	err := s.mailUC.Send(data)
-	if err != nil {
-		s.logger.Errorf("SendService.Send: %v", err)
-		return nil, status.Errorf(codes.Internal, "SendService.Send: %v", err)
+	for i := range s.mailUCS {
+		if s.mailUCS[i].NameService != req.Servicename {
+			continue
+		}
+
+		err := s.mailUCS[i].Service.Send(data)
+		if err != nil {
+			s.logger.Errorf("SendService.Send: %v", err)
+			return nil, status.Errorf(codes.Internal, "SendService.Send: %v", err)
+		}
+
+		return &proto.MailResponse{Message: mail.EmailSentSuccess}, nil
+
 	}
 
-	return &proto.MailResponse{Message: mail.EmailSentSuccess}, nil
+	return nil, status.Error(codes.NotFound, "service name not exist")
 }
