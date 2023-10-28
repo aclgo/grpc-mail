@@ -13,9 +13,9 @@ import (
 	"github.com/aclgo/grpc-mail/pkg/logger"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/exporters/stdout/stdoutmetric"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
+	"go.opentelemetry.io/otel/exporters/zipkin"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/metric/noop"
 	"go.opentelemetry.io/otel/propagation"
@@ -23,6 +23,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
@@ -88,11 +89,41 @@ func (p *Provider) start(attrs ...attribute.KeyValue) (func(), error) {
 		}
 
 	case exporter == "otlp":
-		tr, err = otlptracegrpc.New(context.Background(), otlptracegrpc.WithTLSCredentials(insecure.NewCredentials()))
+
+		// ctxTracer, cancel := context.WithTimeout(context.Background(), time.Second*20)
+		// defer cancel()
+
+		tr, err = zipkin.New(
+			// ctxTracer,
+			p.config.TracerExporterURL,
+			// grpc.WithTransportCredentials(insecure.NewCredentials()),
+			// grpc.WithBlock(),
+		)
+
 		if err != nil {
-			return nil, fmt.Errorf("otlptracergrpc: %v", err)
+			return nil, fmt.Errorf("start.DialContext: %v", err)
 		}
-		mr, err = otlpmetricgrpc.New(context.Background(), otlpmetricgrpc.WithTLSCredentials(insecure.NewCredentials()))
+
+		// tr, err = otlptracegrpc.New(context.Background(), otlptracegrpc.W)
+		// if err != nil {
+		// 	return nil, fmt.Errorf("otlptracergrpc: %v", err)
+		// }
+
+		ctxMeter, cancel := context.WithTimeout(context.Background(), time.Second*20)
+		defer cancel()
+
+		expMeter, err := grpc.DialContext(
+			ctxMeter,
+			p.config.MeterExporterURL,
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithBlock(),
+		)
+
+		if err != nil {
+			return nil, fmt.Errorf("start.DialContext: %v", err)
+		}
+
+		mr, err = otlpmetricgrpc.New(context.Background(), otlpmetricgrpc.WithGRPCConn(expMeter))
 		if err != nil {
 			return nil, fmt.Errorf("otlpmetricgrpc: %v", err)
 		}

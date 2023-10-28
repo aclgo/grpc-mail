@@ -10,6 +10,7 @@ import (
 	"github.com/aclgo/grpc-mail/config"
 	grpcService "github.com/aclgo/grpc-mail/internal/mail/delivery/grpc/service"
 	httpService "github.com/aclgo/grpc-mail/internal/mail/delivery/http/service"
+	"github.com/aclgo/grpc-mail/internal/server/interceptors"
 	"github.com/aclgo/grpc-mail/internal/telemetry"
 	"github.com/aclgo/grpc-mail/pkg/logger"
 	"github.com/aclgo/grpc-mail/proto"
@@ -20,32 +21,35 @@ import (
 type Server struct {
 	config       *config.Config
 	logger       logger.Logger
-	servicesHTTP []*HttpHandlerService
+	serviceHTTP  *HttpHandlerService
 	servicesGRPC *grpcService.MailService
 	provider     *telemetry.Provider
 	stopFn       sync.Once
 }
 
 type HttpHandlerService struct {
-	pattern string
-	service *httpService.MailService
+	endpoint string
+	service  *httpService.MailService
 }
 
-func NewHttpHandlerService(pattern string, service *httpService.MailService) *HttpHandlerService {
+func NewHttpHandlerService(
+	endpoint string,
+	service *httpService.MailService,
+) *HttpHandlerService {
 	return &HttpHandlerService{
-		pattern: pattern,
-		service: service,
+		endpoint: endpoint,
+		service:  service,
 	}
 }
 
 func NewServer(cfg *config.Config,
 	logger logger.Logger,
-	svcsHTTP []*HttpHandlerService,
+	svcHTTP *HttpHandlerService,
 	svcsGRPC *grpcService.MailService, provider *telemetry.Provider) *Server {
 	return &Server{
 		config:       cfg,
 		logger:       logger,
-		servicesHTTP: svcsHTTP,
+		serviceHTTP:  svcHTTP,
 		servicesGRPC: svcsGRPC,
 		provider:     provider,
 	}
@@ -60,10 +64,8 @@ func (s *Server) Run(ctxSignal context.Context) error {
 		errGRPC = make(chan error)
 	)
 
-	// interceptorHTTP := interceptors.NewinterceptorHTTP(s.logger)
-	// interceptorGRPC := interceptors.NewinterceptorGRPC(s.logger)
-
 	go func() {
+		s.logger.Info("http server init")
 		err := s.httpRun(ctxHttp)
 		if err != nil {
 			s.logger.Errorf("Run:%v", err)
@@ -72,6 +74,7 @@ func (s *Server) Run(ctxSignal context.Context) error {
 	}()
 
 	go func() {
+		s.logger.Info("grpc server init")
 		err := s.grpcRun()
 		if err != nil {
 			s.logger.Errorf("Run:%v", err)
@@ -90,17 +93,11 @@ func (s *Server) Run(ctxSignal context.Context) error {
 	}
 }
 
-// type httpServer struct{}
-
-// func (s *httpServer) Shutdown(ctx context.Context) error {
-// 	return nil
-// }
-
 func (s *Server) httpRun(ctx context.Context) error {
+
 	mux := http.NewServeMux()
-	for _, svcHTTP := range s.servicesHTTP {
-		mux.HandleFunc("/api"+svcHTTP.pattern, svcHTTP.service.SendService(ctx))
-	}
+
+	mux.HandleFunc(s.serviceHTTP.endpoint, s.serviceHTTP.service.SendService(ctx))
 
 	s.logger.Infof("server HTTP run on port %d", s.config.ServiceHTTPPort)
 	err := http.ListenAndServe(fmt.Sprintf(":%d", s.config.ServiceHTTPPort), mux)
@@ -112,13 +109,6 @@ func (s *Server) httpRun(ctx context.Context) error {
 	return nil
 }
 
-// type grpcServer struct {
-// }
-
-// func (s *grpcServer) Shutdown(ctx context.Context) error {
-// 	return nil
-// }
-
 func (s *Server) grpcRun() error {
 
 	l, err := net.Listen("tcp", fmt.Sprintf(":%d", s.config.ServiceGRPCPort))
@@ -127,7 +117,11 @@ func (s *Server) grpcRun() error {
 		return fmt.Errorf("grpcRun.Listen: %v", err)
 	}
 
-	opts := []grpc.ServerOption{}
+	interceptorGRPC := interceptors.NewinterceptorGRPC(s.logger)
+
+	opts := []grpc.ServerOption{
+		grpc.UnaryInterceptor(interceptorGRPC.Logger),
+	}
 
 	srv := grpc.NewServer(opts...)
 

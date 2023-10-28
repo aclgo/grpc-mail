@@ -10,7 +10,6 @@ import (
 	"github.com/aclgo/grpc-mail/config"
 	"github.com/aclgo/grpc-mail/internal/adapters/gmail"
 	"github.com/aclgo/grpc-mail/internal/adapters/ses"
-	"github.com/aclgo/grpc-mail/internal/mail/delivery/grpc/service"
 	grpcService "github.com/aclgo/grpc-mail/internal/mail/delivery/grpc/service"
 	httpService "github.com/aclgo/grpc-mail/internal/mail/delivery/http/service"
 	"github.com/aclgo/grpc-mail/internal/mail/usecase"
@@ -22,13 +21,20 @@ import (
 func main() {
 
 	cfg := config.Load(".")
-	// fmt.Println(cfg)
+
+	cfg.OtelExporter = "otlp"
+
+	cfg.Meter.Name = "meter-name"
+	cfg.Tracer.Name = "tracer name"
+
+	cfg.MeterExporterURL = "otel-collector:4317"
+	cfg.Tracer.TracerExporterURL = "http://zipkin:9411/api/v2/spans"
 
 	logger := logger.NewapiLogger(cfg)
 
 	logger.Info("logger init")
 
-	provider, err := telemetry.NewProvider(cfg, logger)
+	tel, err := telemetry.NewProvider(cfg, logger)
 	defer func() {
 		if err != nil {
 			logger.Errorf("cannot initialize telemetry: %v", err)
@@ -36,7 +42,7 @@ func main() {
 		}
 	}()
 
-	defer provider.Shutdown()
+	defer tel.Shutdown()
 
 	logger.Info("provider init")
 
@@ -46,30 +52,30 @@ func main() {
 	sesUC := usecase.NewmailUseCase(ses, logger)
 	gmailUC := usecase.NewmailUseCase(gmail, logger)
 
+	servicesHttpLoad := []*httpService.MailServiceLoad{
+		httpService.NewMailServiceLoad("ses", sesUC),
+		httpService.NewMailServiceLoad("gmail", gmailUC),
+	}
+
 	// HTTP services
-	serviceSesHTTP := httpService.NewMailService(sesUC, logger)
-	serviceGmailHTTP := httpService.NewMailService(gmailUC, logger)
+	servicesHTTP := httpService.NewMailService(logger, tel, servicesHttpLoad...)
 
 	// handlers http
-	handlerSvcSes := server.NewHttpHandlerService("/ses", serviceSesHTTP)
-	handlerSvcGmail := server.NewHttpHandlerService("/gmail", serviceGmailHTTP)
+	handlerHTTP := server.NewHttpHandlerService("/api/v1/send", servicesHTTP)
 
 	// GRPC services
-	servicesGRPC := grpcService.NewMailService(logger,
-		[]*service.MailServiceLoad{
-			service.NewMailServiceLoad("ses", sesUC),
-			service.NewMailServiceLoad("gmail", gmailUC),
-		}...,
+	servicesGRPC := grpcService.NewMailServices(
+		logger,
+		tel,
+		grpcService.NewMailServiceLoad("ses", sesUC),
+		grpcService.NewMailServiceLoad("gmail", gmailUC),
 	)
 
 	server := server.NewServer(cfg,
 		logger,
-		[]*server.HttpHandlerService{
-			handlerSvcSes,
-			handlerSvcGmail,
-		},
+		handlerHTTP,
 		servicesGRPC,
-		provider,
+		tel,
 	)
 
 	signal, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

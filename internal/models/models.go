@@ -7,11 +7,12 @@ import (
 )
 
 type MailBody struct {
-	From     string `json:"from"`
-	To       string `json:"to"`
-	Subject  string `json:"subject"`
-	Body     string `json:"body"`
-	Template string `json:"template"`
+	From        string `json:"from"`
+	To          string `json:"to"`
+	Subject     string `json:"subject"`
+	Body        string `json:"body"`
+	Template    string `json:"template"`
+	ServiceName string `json:"service_name"`
 }
 
 func NewMailBody(from string, to string, subject, body, template string) *MailBody {
@@ -25,8 +26,8 @@ func NewMailBody(from string, to string, subject, body, template string) *MailBo
 }
 
 var (
-	reMail       = regexp.MustCompile("sssssss")
-	InvalidEmail = errors.New("invalid email")
+	reMail          = regexp.MustCompile("sssssss")
+	ErrInvalidEmail = errors.New("invalid email")
 )
 
 func emptyErr(arg string) error {
@@ -36,7 +37,7 @@ func emptyErr(arg string) error {
 func (m *MailBody) Validate() error {
 
 	if !reMail.MatchString(m.To) {
-		return InvalidEmail
+		return ErrInvalidEmail
 	}
 
 	if m.From == "" {
@@ -55,6 +56,10 @@ func (m *MailBody) Validate() error {
 
 	if m.Template == "" {
 		return nil
+	}
+
+	if m.ServiceName == "" {
+		return emptyErr("service_name")
 	}
 
 	return nil

@@ -10,6 +10,7 @@ import (
 type mailUseCase struct {
 	mailUC mail.MailUseCase
 	logger logger.Logger
+	
 }
 
 func NewmailUseCase(mailUC mail.MailUseCase, logger logger.Logger) *mailUseCase {

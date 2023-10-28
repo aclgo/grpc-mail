@@ -41,13 +41,11 @@ func NewapiLogger(config *config.Config) *apiLogger {
 }
 
 var mapLogLevel = map[string]zapcore.Level{
-	"debug":  zapcore.DebugLevel,
-	"info":   zapcore.InfoLevel,
-	"warn":   zapcore.WarnLevel,
-	"error":  zapcore.ErrorLevel,
-	"dpanic": zapcore.DPanicLevel,
-	"panic":  zapcore.PanicLevel,
-	"fatal":  zapcore.FatalLevel,
+	"debug": zapcore.DebugLevel,
+	"info":  zapcore.InfoLevel,
+	"warn":  zapcore.WarnLevel,
+	"error": zapcore.ErrorLevel,
+	"fatal": zapcore.FatalLevel,
 }
 
 func getLoggerLevel(cfg *config.Config) zapcore.Level {
