@@ -2,22 +2,16 @@ package telemetry
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
-	"os"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/aclgo/grpc-mail/config"
 	"github.com/aclgo/grpc-mail/pkg/logger"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
-	"go.opentelemetry.io/otel/exporters/stdout/stdoutmetric"
-	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/exporters/zipkin"
 	"go.opentelemetry.io/otel/metric"
-	"go.opentelemetry.io/otel/metric/noop"
 	"go.opentelemetry.io/otel/propagation"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -28,45 +22,29 @@ import (
 )
 
 type Provider struct {
-	config     *config.Config
-	logger     logger.Logger
-	tracer     trace.Tracer
-	meter      metric.Meter
-	propagator propagation.TextMapPropagator
-	Shutdown   func()
+	config         *config.Config
+	logger         logger.Logger
+	TracerProvider trace.TracerProvider
+	MeterProvider  metric.MeterProvider
+	propagator     propagation.TextMapPropagator
+	Shutdown       func()
 }
 
-func NewProvider(config *config.Config, logger logger.Logger, attrs ...attribute.KeyValue) (*Provider, error) {
+func NewProvider(config *config.Config, logger logger.Logger, attrs ...attribute.KeyValue) *Provider {
 
 	provider := &Provider{
 		config: config,
 		logger: logger,
 	}
 
-	fn, err := provider.start(attrs...)
-	if err != nil {
-		return nil, err
-	}
+	fn := provider.start(attrs...)
 
 	provider.Shutdown = fn
 
-	return provider, nil
+	return provider
 }
 
-func (p *Provider) Logger() logger.Logger {
-	return p.logger
-}
-func (p *Provider) Tracer() trace.Tracer {
-	return p.tracer
-}
-func (p *Provider) Meter() metric.Meter {
-	return p.meter
-}
-func (p *Provider) Propagator() propagation.TextMapPropagator {
-	return p.propagator
-}
-
-func (p *Provider) start(attrs ...attribute.KeyValue) (func(), error) {
+func (p *Provider) start(attrs ...attribute.KeyValue) func() {
 
 	var (
 		tr  sdktrace.SpanExporter
@@ -76,78 +54,59 @@ func (p *Provider) start(attrs ...attribute.KeyValue) (func(), error) {
 
 	p.propagator = propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{})
 
-	switch exporter := strings.TrimSpace(strings.ToLower(p.config.OtelExporter)); {
-	case exporter == "stdout":
-		tr, err = stdouttrace.New()
-		if err != nil {
-			return nil, fmt.Errorf("stdouttrace: %v", err)
-		}
+	tr, err = zipkin.New(
+		// ctxTracer,
+		p.config.TracerExporterURL,
+		// grpc.WithTransportCredentials(insecure.NewCredentials()),
+		// grpc.WithBlock(),
+	)
 
-		mr, err = stdoutmetric.New(stdoutmetric.WithEncoder(json.NewEncoder(os.Stdout)))
-		if err != nil {
-			return nil, fmt.Errorf("stdoutmetric: %v", err)
-		}
+	if err != nil {
 
-	case exporter == "otlp":
+		p.logger.Errorf("start.DialContext: %v", err)
+		return nil
+	}
 
-		// ctxTracer, cancel := context.WithTimeout(context.Background(), time.Second*20)
-		// defer cancel()
+	ctx := context.Background()
 
-		tr, err = zipkin.New(
-			// ctxTracer,
-			p.config.TracerExporterURL,
-			// grpc.WithTransportCredentials(insecure.NewCredentials()),
-			// grpc.WithBlock(),
-		)
+	expMeter, err := grpc.DialContext(
+		ctx,
+		p.config.MeterExporterURL,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock(),
+	)
 
-		if err != nil {
-			return nil, fmt.Errorf("start.DialContext: %v", err)
-		}
+	if err != nil {
+		p.logger.Errorf("start.DialContext: %v", err)
+		return nil
+	}
 
-		// tr, err = otlptracegrpc.New(context.Background(), otlptracegrpc.W)
-		// if err != nil {
-		// 	return nil, fmt.Errorf("otlptracergrpc: %v", err)
-		// }
-
-		ctxMeter, cancel := context.WithTimeout(context.Background(), time.Second*20)
-		defer cancel()
-
-		expMeter, err := grpc.DialContext(
-			ctxMeter,
-			p.config.MeterExporterURL,
-			grpc.WithTransportCredentials(insecure.NewCredentials()),
-			grpc.WithBlock(),
-		)
-
-		if err != nil {
-			return nil, fmt.Errorf("start.DialContext: %v", err)
-		}
-
-		mr, err = otlpmetricgrpc.New(context.Background(), otlpmetricgrpc.WithGRPCConn(expMeter))
-		if err != nil {
-			return nil, fmt.Errorf("otlpmetricgrpc: %v", err)
-		}
-	default:
-		p.tracer = trace.NewNoopTracerProvider().Tracer(p.config.Tracer.Name)
-		p.meter = noop.NewMeterProvider().Meter(p.config.Tracer.Name)
-		return func() {}, nil
+	mr, err = otlpmetricgrpc.New(context.Background(), otlpmetricgrpc.WithGRPCConn(expMeter))
+	if err != nil {
+		p.logger.Errorf("otlpmetricgrpc: %v", err)
+		return nil
 	}
 
 	res, err := resource.New(
-		context.Background(),
+		ctx,
 		resource.WithAttributes(attrs...),
 	)
 
 	if err != nil {
-		return nil, fmt.Errorf("cannot initialize tracer resource: %v", err)
+		p.logger.Errorf("cannot initialize tracer resource: %v", err)
+		return nil
 	}
 
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSampler(sdktrace.AlwaysSample()), sdktrace.WithResource(res), sdktrace.WithBatcher(tr))
 	mp := sdkmetric.NewMeterProvider(sdkmetric.WithReader(sdkmetric.NewPeriodicReader(mr)))
 
-	p.tracer = tp.Tracer(p.config.Tracer.Name)
-	p.meter = mp.Meter(p.config.Tracer.Name)
+	p.TracerProvider = tp
+	p.MeterProvider = mp
 	p.propagator = propagation.NewCompositeTextMapPropagator()
+
+	otel.SetMeterProvider(mp)
+	otel.SetTracerProvider(tp)
+	otel.SetTextMapPropagator(p.propagator)
 
 	return func() {
 		haltctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -171,6 +130,6 @@ func (p *Provider) start(attrs ...attribute.KeyValue) (func(), error) {
 		}()
 
 		w.Wait()
-	}, nil
+	}
 
 }

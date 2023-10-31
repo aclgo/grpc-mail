@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type ResponsOK struct {
@@ -15,9 +18,12 @@ type ResponseError struct {
 	StatusCode int    `json:"status_code"`
 }
 
-func JSON(w http.ResponseWriter, value any, statusCode int) {
+func JSON(span trace.Span, spanMessage string, w http.ResponseWriter, value any, statusCode int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
+
+	span.SetStatus(codes.Code(statusCode), spanMessage)
+	span.End()
 
 	if err := json.NewEncoder(w).Encode(value); err != nil {
 		fmt.Fprint(w, ResponseError{Error: err.Error(), StatusCode: http.StatusInternalServerError})

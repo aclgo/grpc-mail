@@ -2,7 +2,6 @@ package service
 
 import (
 	"github.com/aclgo/grpc-mail/internal/mail"
-	"github.com/aclgo/grpc-mail/internal/telemetry"
 	"github.com/aclgo/grpc-mail/pkg/logger"
 	"github.com/aclgo/grpc-mail/proto"
 )
@@ -20,18 +19,18 @@ func NewMailServiceLoad(name string, service mail.MailUseCase) *MailServiceLoad 
 }
 
 type MailService struct {
-	mailUCS   map[string]mail.MailUseCase
-	logger    logger.Logger
-	telemetry *telemetry.Provider
+	mailUCS  map[string]mail.MailUseCase
+	logger   logger.Logger
+	observer *mail.Observer
 	proto.UnimplementedMailServiceServer
 }
 
-func NewMailServices(logger logger.Logger, tel *telemetry.Provider, mailsl ...*MailServiceLoad) *MailService {
+func NewMailServices(logger logger.Logger, obs *mail.Observer, mailsl ...*MailServiceLoad) *MailService {
 
 	svcs := MailService{
-		mailUCS:   make(map[string]mail.MailUseCase),
-		logger:    logger,
-		telemetry: tel,
+		mailUCS:  make(map[string]mail.MailUseCase),
+		logger:   logger,
+		observer: obs,
 	}
 
 	for _, v := range mailsl {

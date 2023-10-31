@@ -2,14 +2,13 @@ package service
 
 import (
 	"github.com/aclgo/grpc-mail/internal/mail"
-	"github.com/aclgo/grpc-mail/internal/telemetry"
 	"github.com/aclgo/grpc-mail/pkg/logger"
 )
 
 type MailService struct {
 	svcsMail map[string]mail.MailUseCase
 	logger   logger.Logger
-	tel      *telemetry.Provider
+	observer *mail.Observer
 }
 
 type MailServiceLoad struct {
@@ -24,12 +23,12 @@ func NewMailServiceLoad(svcName string, mailService mail.MailUseCase) *MailServi
 	}
 }
 
-func NewMailService(logger logger.Logger, telemetry *telemetry.Provider, svcs ...*MailServiceLoad) *MailService {
+func NewMailService(logger logger.Logger, obs *mail.Observer, svcs ...*MailServiceLoad) *MailService {
 
 	mailServices := MailService{
 		svcsMail: make(map[string]mail.MailUseCase),
 		logger:   logger,
-		tel:      telemetry,
+		observer: obs,
 	}
 
 	for _, value := range svcs {

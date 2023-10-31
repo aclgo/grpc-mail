@@ -15,13 +15,14 @@ type MailBody struct {
 	ServiceName string `json:"service_name"`
 }
 
-func NewMailBody(from string, to string, subject, body, template string) *MailBody {
+func NewMailBody(from string, to string, subject, body, template, svcName string) *MailBody {
 	return &MailBody{
-		From:     from,
-		To:       to,
-		Subject:  subject,
-		Body:     body,
-		Template: template,
+		From:        from,
+		To:          to,
+		Subject:     subject,
+		Body:        body,
+		Template:    template,
+		ServiceName: svcName,
 	}
 }
 

@@ -11,7 +11,6 @@ import (
 	grpcService "github.com/aclgo/grpc-mail/internal/mail/delivery/grpc/service"
 	httpService "github.com/aclgo/grpc-mail/internal/mail/delivery/http/service"
 	"github.com/aclgo/grpc-mail/internal/server/interceptors"
-	"github.com/aclgo/grpc-mail/internal/telemetry"
 	"github.com/aclgo/grpc-mail/pkg/logger"
 	"github.com/aclgo/grpc-mail/proto"
 
@@ -23,7 +22,6 @@ type Server struct {
 	logger       logger.Logger
 	serviceHTTP  *HttpHandlerService
 	servicesGRPC *grpcService.MailService
-	provider     *telemetry.Provider
 	stopFn       sync.Once
 }
 
@@ -45,13 +43,12 @@ func NewHttpHandlerService(
 func NewServer(cfg *config.Config,
 	logger logger.Logger,
 	svcHTTP *HttpHandlerService,
-	svcsGRPC *grpcService.MailService, provider *telemetry.Provider) *Server {
+	svcsGRPC *grpcService.MailService) *Server {
 	return &Server{
 		config:       cfg,
 		logger:       logger,
 		serviceHTTP:  svcHTTP,
 		servicesGRPC: svcsGRPC,
-		provider:     provider,
 	}
 }
 
@@ -65,7 +62,7 @@ func (s *Server) Run(ctxSignal context.Context) error {
 	)
 
 	go func() {
-		s.logger.Info("http server init")
+		s.logger.Infof("http server init port %v", s.config.ServiceHTTPPort)
 		err := s.httpRun(ctxHttp)
 		if err != nil {
 			s.logger.Errorf("Run:%v", err)
@@ -74,7 +71,7 @@ func (s *Server) Run(ctxSignal context.Context) error {
 	}()
 
 	go func() {
-		s.logger.Info("grpc server init")
+		s.logger.Infof("grpc server init port %v", s.config.ServiceGRPCPort)
 		err := s.grpcRun()
 		if err != nil {
 			s.logger.Errorf("Run:%v", err)
