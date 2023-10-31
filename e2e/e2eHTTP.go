@@ -53,7 +53,7 @@ func RunHTTP(addrServer string, logger logger.Logger) {
 
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusBadRequest || resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusBadRequest && resp.StatusCode != http.StatusOK {
 		logger.Errorf("ERROR e2e test http endpoint")
 		return
 	}
