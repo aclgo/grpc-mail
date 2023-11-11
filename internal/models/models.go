@@ -27,7 +27,7 @@ func NewMailBody(from string, to string, subject, body, template, svcName string
 }
 
 var (
-	reMail          = regexp.MustCompile("sssssss")
+	reMailValid     = regexp.MustCompile(`^[a-zA-Z0-9._%-+]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
 	ErrInvalidEmail = errors.New("invalid email")
 )
 
@@ -37,10 +37,6 @@ func emptyErr(arg string) error {
 
 func (m *MailBody) Validate() error {
 
-	if !reMail.MatchString(m.To) {
-		return ErrInvalidEmail
-	}
-
 	if m.From == "" {
 		return emptyErr("from")
 	}
@@ -48,6 +44,11 @@ func (m *MailBody) Validate() error {
 	if m.To == "" {
 		return emptyErr("to")
 	}
+
+	if !reMailValid.MatchString(m.To) {
+		return ErrInvalidEmail
+	}
+
 	if m.Subject == "" {
 		return emptyErr("subject")
 	}
