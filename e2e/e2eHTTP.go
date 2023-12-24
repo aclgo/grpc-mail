@@ -20,12 +20,12 @@ func Newe2eTest() *e2eHTTPTest {
 
 func RunHTTP(addrServer string, logger logger.Logger) {
 	params := models.NewMailBody(
-		"from",
-		"to",
-		"subject",
-		"body",
-		"template",
-		"service_name",
+		"i am",
+		"arcelo2022@gmail.com",
+		"test e2e",
+		"<h1>Hello</hello>",
+		"<body><div><h1>template pre definida + body => %s</h1></div></body>",
+		"gmail",
 	)
 
 	js, err := json.Marshal(params)

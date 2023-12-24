@@ -62,7 +62,7 @@ func (s *Server) Run(ctxSignal context.Context) error {
 	)
 
 	go func() {
-		s.logger.Infof("http server init port %v", s.config.ServiceHTTPPort)
+		// s.logger.Infof("http server init port %v", s.config.ServiceHTTPPort)
 		err := s.httpRun(ctxHttp)
 		if err != nil {
 			s.logger.Errorf("Run:%v", err)
@@ -71,7 +71,7 @@ func (s *Server) Run(ctxSignal context.Context) error {
 	}()
 
 	go func() {
-		s.logger.Infof("grpc server init port %v", s.config.ServiceGRPCPort)
+		// s.logger.Infof("grpc server init port %v", s.config.ServiceGRPCPort)
 		err := s.grpcRun()
 		if err != nil {
 			s.logger.Errorf("Run:%v", err)

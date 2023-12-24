@@ -2,6 +2,8 @@ package telemetry
 
 import (
 	"context"
+	"encoding/json"
+	"os"
 	"sync"
 	"time"
 
@@ -10,6 +12,8 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
+	"go.opentelemetry.io/otel/exporters/stdout/stdoutmetric"
+	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/exporters/zipkin"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/propagation"
@@ -54,38 +58,54 @@ func (p *Provider) start(attrs ...attribute.KeyValue) func() {
 
 	p.propagator = propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{})
 
-	tr, err = zipkin.New(
-		// ctxTracer,
-		p.config.TracerExporterURL,
-		// grpc.WithTransportCredentials(insecure.NewCredentials()),
-		// grpc.WithBlock(),
-	)
+	if p.config.OtelExporter == "stdout" {
+		tr, err = stdouttrace.New()
+		if err != nil {
+			return nil
+		}
 
-	if err != nil {
+		mr, err = stdoutmetric.New(stdoutmetric.WithEncoder(json.NewEncoder(os.Stdout)))
+		if err != nil {
+			return nil
+		}
 
-		p.logger.Errorf("start.DialContext: %v", err)
-		return nil
+	} else {
+		tr, err = zipkin.New(
+			// ctxTracer,
+			p.config.TracerExporterURL,
+			// grpc.WithTransportCredentials(insecure.NewCredentials()),
+			// grpc.WithBlock(),
+		)
+
+		if err != nil {
+
+			p.logger.Errorf("start.DialContext: %v", err)
+			return nil
+		}
+
+		ctx := context.Background()
+
+		expMeter, err := grpc.DialContext(
+			ctx,
+			p.config.MeterExporterURL,
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithBlock(),
+		)
+
+		if err != nil {
+			p.logger.Errorf("start.DialContext: %v", err)
+			return nil
+		}
+
+		mr, err = otlpmetricgrpc.New(context.Background(), otlpmetricgrpc.WithGRPCConn(expMeter))
+		if err != nil {
+			p.logger.Errorf("otlpmetricgrpc: %v", err)
+			return nil
+		}
+
 	}
 
 	ctx := context.Background()
-
-	expMeter, err := grpc.DialContext(
-		ctx,
-		p.config.MeterExporterURL,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithBlock(),
-	)
-
-	if err != nil {
-		p.logger.Errorf("start.DialContext: %v", err)
-		return nil
-	}
-
-	mr, err = otlpmetricgrpc.New(context.Background(), otlpmetricgrpc.WithGRPCConn(expMeter))
-	if err != nil {
-		p.logger.Errorf("otlpmetricgrpc: %v", err)
-		return nil
-	}
 
 	res, err := resource.New(
 		ctx,

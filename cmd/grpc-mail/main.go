@@ -26,14 +26,6 @@ func main() {
 
 	cfg := config.Load(".")
 
-	cfg.OtelExporter = "otlp"
-
-	// cfg.Meter.Name = "grpc-mail"
-	// cfg.Tracer.Name = "grpc-mail"
-
-	cfg.MeterExporterURL = "http://localhost:4317"
-	cfg.Tracer.TracerExporterURL = "http://localhost:9411/api/v2/spans"
-
 	logger := logger.NewapiLogger(cfg)
 
 	logger.Info("logger init")
@@ -64,7 +56,10 @@ func main() {
 	servicesHTTP := httpService.NewMailService(logger, observer, servicesHttpLoad...)
 
 	// HTTP handlers
-	handlerHTTP := server.NewHttpHandlerService("/api/v1/send", servicesHTTP)
+
+	endpoint := "/api/v1/send"
+
+	handlerHTTP := server.NewHttpHandlerService(endpoint, servicesHTTP)
 
 	// GRPC services
 	servicesGRPC := grpcService.NewMailServices(
@@ -86,7 +81,7 @@ func main() {
 	go func() {
 		time.Sleep(time.Second * 10)
 		e2e.RunGRPC(fmt.Sprintf("localhost:%v", cfg.ServiceGRPCPort), logger)
-		e2e.RunHTTP(fmt.Sprintf("http://localhost:%v/api/v1/send", cfg.ServiceHTTPPort), logger)
+		e2e.RunHTTP(fmt.Sprintf("http://localhost:%v%s", cfg.ServiceHTTPPort, endpoint), logger)
 	}()
 
 	if err := server.Run(signal); err != nil {

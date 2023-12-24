@@ -7,3 +7,28 @@ services:
     ports:
       - 3003:3003
       - 50053:50053
+    env_file:
+      - .env
+
+  # zipkin:
+  #   image: openzipkin/zipkin
+  #   container_name: zipkin
+  #   ports:
+  #     - 9411:9411 
+
+
+  # otel-collector:
+  #   image: otel/opentelemetry-collector-contrib:0.62.1
+  #   container_name: otel-collector
+  #   command: ["--config=/etc/otel-collector-config.yaml"]
+  #   volumes:
+  #     - ./docker-compose-files/otel/otel-collector.yaml:/etc/otel-collector-config.yaml
+  #   ports:
+  #     - "4317:4317"
+  #     - "4318:4318"
+  #     - "8888:8888"
+  #     - "8889:8889"
+  #   depends_on:
+  #     - zipkin
+
+      

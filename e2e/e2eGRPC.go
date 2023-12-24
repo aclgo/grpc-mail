@@ -36,12 +36,12 @@ func RunGRPC(addrServer string, logger logger.Logger) {
 	mailClient := proto.NewMailServiceClient(conn)
 
 	param := models.NewMailBody(
-		"from",
-		"to",
-		"subject",
-		"body",
-		"<h1>hello</h1>",
-		"service name",
+		"i am",
+		"arcelo2022@gmail.com",
+		"test e2e",
+		"<h1>Hello</hello>",
+		"<body><div><h1>template pre definida + body => %s</h1></div></body>",
+		"gmail",
 	)
 
 	_, err = mailClient.SendService(

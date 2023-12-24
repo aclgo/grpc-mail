@@ -14,7 +14,7 @@ WORKDIR /app
 COPY --from=builder /app/mail ./
 COPY --from=builder /app/.env ./
 EXPOSE 3003
-EXPOSE 5003
+EXPOSE 50053
 
 ENTRYPOINT [ "./mail" ]
 
